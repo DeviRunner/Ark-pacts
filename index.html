@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>卫戍协议盟约图鉴</title>
+<style>
+/* Layout: fixed ban sidebar on the left, two views on the right (pact board / free graph). */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --surface-2:#f6f7f9; --ink:#1a1e26; --muted:#677080; --line:#d8dce3; --accent:#2c66d0;
+  --r-stack:#2c66d0; --r-once:#0b8780; --r-fight:#c23b33; --r-prep:#a26f00; --r-spec:#8646c2;
+  --font-body:"Noto Sans SC",system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+  --font-display:"Saira Condensed","Noto Sans SC",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11141a; --surface:#191d25; --surface-2:#1f242e; --ink:#e6e8ed; --muted:#8e97a6; --line:#2d3441; --accent:#76a2ff;
+    --r-stack:#7aa6ff; --r-once:#41c6bd; --r-fight:#ff7a70; --r-prep:#e2b13f; --r-spec:#c29bff; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11141a; --surface:#191d25; --surface-2:#1f242e; --ink:#e6e8ed; --muted:#8e97a6; --line:#2d3441; --accent:#76a2ff;
+  --r-stack:#7aa6ff; --r-once:#41c6bd; --r-fight:#ff7a70; --r-prep:#e2b13f; --r-spec:#c29bff; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font-body);display:flex;flex-direction:column;overflow:hidden}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.role-stack{--rc:var(--r-stack)} .role-once{--rc:var(--r-once)} .role-fight{--rc:var(--r-fight)} .role-prep{--rc:var(--r-prep)} .role-spec{--rc:var(--r-spec)}
+
+/* header */
+.top{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:10px 18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.02em}
+.top .sub{color:var(--muted);font-size:12px}
+.top .src{color:var(--muted);font-size:11.5px;max-width:720px}
+.top .src a{color:var(--accent);text-decoration:none}
+.top .src a:hover{text-decoration:underline}
+.tabs{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:3px}
+.tabs a{padding:5px 14px;border-radius:6px;text-decoration:none;color:var(--muted);font-weight:500}
+.tabs a.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-left:auto;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend b{color:var(--rc);font-weight:700}
+
+.layout{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0}
+aside{border-right:1px solid var(--line);background:var(--surface);overflow:auto;padding:14px 16px 24px;display:flex;flex-direction:column;gap:18px}
+main{min-width:0;min-height:0;position:relative}
+.view{position:absolute;inset:0}
+.view[hidden]{display:none}
+
+/* sidebar */
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:13px}
+.sec-h span{font:600 15px var(--font-display);color:var(--muted);font-variant-numeric:tabular-nums}
+.pillgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.ptog{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:4px 0;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.ptog:hover:not(:disabled){border-color:var(--muted)}
+.ptog.on{background:var(--r-fight);border-color:var(--r-fight);color:#fff;text-decoration:line-through}
+.ptog:disabled{opacity:.4;cursor:not-allowed}
+.rule{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.rule label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.search{width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2)}
+.sres{display:flex;flex-direction:column;gap:2px}
+.sres button{display:flex;justify-content:space-between;gap:8px;text-align:left;border:0;background:none;padding:4px 6px;border-radius:5px;cursor:pointer}
+.sres button:hover{background:var(--surface-2)}
+.sres .nm{color:var(--ink);font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.sres img{width:24px;height:24px;border-radius:5px;border:2px solid var(--rc)}
+.sres .pk{color:var(--muted);font-size:11.5px}
+.sres .st{font-size:11.5px;color:var(--r-fight)}
+.banned{display:flex;flex-wrap:wrap;gap:5px}
+.btag{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:5px;padding:2px 5px 2px 2px;font-size:12px;background:var(--surface-2);cursor:pointer}
+.btag img{width:22px;height:22px;border-radius:4px;border:2px solid var(--rc);filter:grayscale(1)}
+.btag:hover{border-color:var(--r-fight)}
+.btag i{font-style:normal;color:var(--muted)}
+.hint{margin:0;font-size:11.5px;color:var(--muted)}
+.avail{display:flex;flex-direction:column;gap:6px}
+.arow{display:grid;grid-template-columns:44px 1fr;gap:6px;align-items:start}
+.tl{font:700 13px/20px var(--font-display);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.arow .names{display:flex;flex-wrap:wrap;gap:4px}
+.arow .names span{color:var(--rc)}
+.clear{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:6px;cursor:pointer}
+.clear:hover{border-color:var(--r-fight);color:var(--r-fight)}
+
+/* pact board */
+#view-pacts{overflow:auto;padding:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(640px,1fr));gap:16px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;border-top:4px solid var(--pc)}
+.card.banned-pact{opacity:.45;filter:grayscale(.8)}
+.card>header{display:flex;align-items:baseline;gap:12px;padding:10px 14px 4px;flex-wrap:wrap}
+.card h3{margin:0;font-size:18px;font-weight:700}
+.card .meta{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.card .tag-ban{font-size:11px;color:#fff;background:var(--r-fight);padding:0 6px;border-radius:4px}
+.card details{padding:0 14px;font-size:12.5px;color:var(--muted)}
+.card summary{cursor:pointer;width:max-content}
+.card details p{margin:4px 0 6px;white-space:pre-line;color:var(--ink);max-width:80ch}
+.body{position:relative;display:grid;grid-template-columns:minmax(140px,210px) 1fr minmax(140px,210px);gap:40px;padding:12px 14px 16px}
+.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible}
+.wires .w{fill:none;stroke:var(--muted);stroke-width:1.1;opacity:.42;transition:opacity .12s}
+.wires .w.off{stroke-dasharray:3 4;opacity:.15}
+.wires .dot{fill:var(--muted);opacity:.5}
+.card.focus .wires .w{opacity:.07}
+.card.focus .wires .dot{opacity:.15}
+.card.focus .wires .w.hl{opacity:1;stroke:var(--accent);stroke-width:2;stroke-dasharray:none}
+.side{display:flex;flex-direction:column;gap:10px;justify-content:center;position:relative;z-index:1}
+.center{display:flex;flex-direction:column;gap:9px;justify-content:center;position:relative;z-index:1}
+.trow{display:grid;grid-template-columns:30px 1fr;gap:6px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:8px 10px;justify-content:center}
+/* operator avatar: border colour = role */
+.av{--sz:46px;--bw:3px;position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:0;cursor:pointer;vertical-align:top}
+.av img{width:var(--sz);height:var(--sz);border-radius:8px;border:var(--bw) solid var(--rc);background:var(--surface-2);display:block;transition:transform .1s}
+.av:hover img{transform:translateY(-2px)}
+.av .cap{display:none;font-size:11px;line-height:1.2;color:var(--ink);max-width:calc(var(--sz) + 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.names .av .cap{display:block}
+.av .xp{position:absolute;top:-4px;right:-4px;display:flex;gap:2px}
+.av .xp i{width:11px;height:11px;border-radius:50%;border:2px solid var(--surface);display:block}
+.av.off img{filter:grayscale(1);opacity:.35}
+.av.off::after{content:"";position:absolute;left:2px;width:calc(var(--sz) - 4px);top:calc(var(--sz) / 2 - 1px);height:2.5px;background:var(--r-fight);transform:rotate(-45deg);border-radius:2px}
+.av.hl img{box-shadow:0 0 0 3px var(--accent)}
+.av.sm{--sz:32px;--bw:2px}
+.av.xs{--sz:28px;--bw:2px}
+.av.xs .cap,.av.sm .cap{font-size:10px}
+.sbox.hl{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+.legend i{width:13px;height:13px;border-radius:3px;border:3px solid var(--rc);display:inline-block}
+.namesw{display:flex;gap:5px;align-items:center;font-size:12.5px;cursor:pointer}
+.sbox{border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:6px 9px 7px}
+.sh{font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:6px}
+.sh span{font:600 12px var(--font-display);color:var(--muted)}
+.sops{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.se{font-size:11.5px;color:var(--muted);margin-top:1px}
+.se summary{cursor:pointer;width:max-content}
+.se p{margin:3px 0 2px;font-size:12px;color:var(--ink);white-space:pre-line;line-height:1.45}
+.sh span{font-weight:500}
+.mini{border:0;background:none;padding:0;color:var(--rc);cursor:pointer;font-size:12px}
+.mini sub{font:600 10px var(--font-display);color:var(--muted);vertical-align:baseline;margin-left:1px}
+.mini.off{color:var(--muted);text-decoration:line-through;opacity:.5}
+.mini:hover{text-decoration:underline}
+.none{font-size:11.5px;color:var(--muted)}
+@media (max-width:760px){
+  .cards{grid-template-columns:1fr}
+  .body{grid-template-columns:1fr;gap:12px}
+  .wires{display:none}
+}
+
+/* graph */
+#view-graph{display:flex;flex-direction:column}
+#view-graph[hidden]{display:none}
+.gtools{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--surface);font-size:12.5px}
+.gtools label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.gtools button{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:3px 10px;cursor:pointer}
+.gtools button:hover{border-color:var(--muted)}
+.gtools .hint{margin-left:auto}
+.gwrap{flex:1;position:relative;min-height:0}
+#g{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none;user-select:none}
+#g.panning{cursor:grabbing}
+.ge{stroke-width:1.3;opacity:.45}
+.ge.sub{stroke:var(--muted);stroke-dasharray:4 4;opacity:.2;stroke-width:1}
+.gn{cursor:pointer}
+.gn .bd{fill:var(--rc)}
+.gn.multi .bd{stroke:var(--ink);stroke-width:2}
+.gn .tb{fill:var(--surface);stroke:var(--line)}
+.gn text{font:700 10px var(--font-display);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.gn text.nm{font:500 11px var(--font-body);fill:var(--ink);display:none;paint-order:stroke;stroke:var(--bg);stroke-width:3px}
+body.names .gn text.nm{display:block}
+.gh circle{stroke:var(--surface);stroke-width:3}
+.gh text{font:700 15px var(--font-body);fill:#fff;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.gh.sub rect{fill:var(--surface-2);stroke:var(--muted);stroke-dasharray:4 3}
+.gh.sub text{fill:var(--ink);font-size:13px}
+.gh{cursor:move}
+.off{opacity:.18}
+.gone{display:none}
+#g.hov .gn:not(.hl):not(.nb),#g.hov .gh:not(.hl):not(.nb){opacity:.12}
+#g.hov .ge:not(.hl){opacity:.04}
+#g.hov .ge.hl{opacity:1;stroke-width:2.2}
+.info{position:absolute;left:14px;bottom:14px;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:0 4px 18px rgba(0,0,0,.15);font-size:12.5px}
+.info[hidden]{display:none}
+.info h4{margin:0 0 4px;font-size:15px;color:var(--rc)}
+.info .row{color:var(--muted)}
+.info p{margin:5px 0 0}
+.info .acts{display:flex;gap:8px;margin-top:8px}
+.info button{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:3px 10px;cursor:pointer}
+
+/* tooltip */
+#tip{position:fixed;z-index:50;pointer-events:none;max-width:340px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+#tip[hidden]{display:none}
+#tip b{color:var(--rc);font-size:14px}
+#tip .row{color:var(--muted)}
+#tip p{margin:4px 0 0}
+#tip .lab{color:var(--muted)}
+
+@media (max-width:900px){
+  body{overflow:auto}
+  .layout{grid-template-columns:1fr;display:flex;flex-direction:column}
+  aside{border-right:0;border-bottom:1px solid var(--line);max-height:none}
+  main{min-height:80vh}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>卫戍协议：规程 · 盟约图鉴</h1>
+    <div class="sub" id="subline"></div>
+    <div class="src">数据来源：<a href="https://squad-pool.com/arknights-pacts">SquadPool 盟约查询</a>，原始数据整理自 <a href="https://prts.wiki/">PRTS Wiki</a>（CC BY-NC-SA 3.0）和玩家整理的《干员快速查询器》 · 头像：<a href="https://github.com/yuanyan3060/ArknightsGameResource">ArknightsGameResource</a> · 游戏素材版权归鹰角网络 · 数据取于 2026-11-17</div>
+  </div>
+  <nav class="tabs" aria-label="视图">
+    <a href="#pacts" data-view="pacts">主盟约分屏</a>
+    <a href="#graph" data-view="graph">全干员关系图</a>
+  </nav>
+  <div class="legend" id="legend"></div>
+  <label class="namesw"><input type="checkbox" id="showNames"> 显示名字</label>
+</header>
+<div class="layout">
+  <aside>
+    <div class="sec">
+      <div class="sec-h">禁用主盟约 <span id="bpCount">0/5</span></div>
+      <div class="pillgrid" id="banPacts"></div>
+      <div class="rule" role="radiogroup" aria-label="多主盟约干员的判定">
+        <label><input type="radio" name="rule" id="ruleAny" value="any" checked> 有多个主盟约的干员：任一被禁即不可用</label>
+        <label><input type="radio" name="rule" id="ruleAll" value="all"> 有多个主盟约的干员：全部被禁才不可用</label>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-h">禁用干员 <span id="boCount">0</span></div>
+      <input class="search" id="opSearch" type="search" placeholder="搜索干员，回车禁用第一个" autocomplete="off">
+      <div class="sres" id="searchRes"></div>
+      <div class="banned" id="bannedOps"></div>
+      <p class="hint">也可以直接点卡片或关系图里的干员来禁用、解禁。</p>
+    </div>
+    <div class="sec">
+      <div class="sec-h">可用干员 <span id="availCount"></span></div>
+      <div class="avail" id="availList"></div>
+    </div>
+    <button class="clear" id="clearBans" type="button">清空全部禁用</button>
+  </aside>
+  <main>
+    <section class="view" id="view-pacts">
+      <div class="cards" id="cards"></div>
+    </section>
+    <section class="view" id="view-graph" hidden>
+      <div class="gtools">
+        <label><input type="checkbox" id="gCore" checked> 主盟约连线</label>
+        <label><input type="checkbox" id="gSub" checked> 副盟约连线</label>
+        <label><input type="checkbox" id="gHide"> 隐藏不可用干员</label>
+        <button type="button" id="gFit">适应窗口</button>
+        <button type="button" id="gReset">重新布局</button>
+        <p class="hint">拖动干员或盟约调整位置，拖主盟约会带着只属于它的干员一起走；拖空白处平移，滚轮缩放</p>
+      </div>
+      <div class="gwrap">
+        <svg id="g" aria-label="全干员关系图"><defs><clipPath id="avclip"><rect x="-19" y="-19" width="38" height="38" rx="6"/></clipPath></defs><g id="vp"><g id="gEdges"></g><g id="gNodes"></g></g></svg>
+        <div class="info" id="ginfo" hidden></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const DATA = {"ops": [{"name": "折桠", "pacts": ["乌萨斯", "不屈"], "tier": 1, "n": "<进入休整期时>转化2层【乌萨斯】临时层数为固定层数", "e": "<进入休整期时>转化4层【乌萨斯】临时层数为固定层数", "type": "持续叠加", "head": "4207_branch"}, {"name": "艾丝黛尔", "pacts": ["萨尔贡", "独行"], "tier": 1, "n": "<战斗中>每次开启技能时使已激活的【萨尔贡】层数+1（每回合至多叠加2层）", "e": "<战斗中>每次开启技能时使已激活的【萨尔贡】层数+2（每回合至多叠加4层）", "type": "持续叠加", "head": "127_estell"}, {"name": "幽灵鲨", "pacts": ["阿戈尔"], "tier": 1, "n": "<战斗中>部署时使已激活的【阿戈尔】层数+1（每回合至多叠加1层）", "e": "<战斗中>部署时使已激活的【阿戈尔】层数+2（每回合至多叠加2层）", "type": "持续叠加", "head": "143_ghost"}, {"name": "野鬃", "pacts": ["卡西米尔", "助力"], "tier": 1, "n": "<战斗中>部署时使已激活的【卡西米尔】层数+1（每回合至多叠加2层）", "e": "<战斗中>部署时使已激活的【卡西米尔】层数+2（每回合至多叠加4层）", "type": "持续叠加", "head": "496_wildmn"}, {"name": "慕斯", "pacts": ["维多利亚"], "tier": 1, "n": "<休整期结束时>使已激活的【维多利亚】层数+1", "e": "<休整期结束时>使已激活的【维多利亚】层数+2", "type": "持续叠加", "head": "185_frncat"}, {"name": "角峰", "pacts": ["谢拉格", "坚守"], "tier": 1, "n": "<战斗中>对每名敌人首次造成伤害时使目标陷入2秒寒冷", "e": "<战斗中>对每名敌人首次造成伤害时使目标陷入4秒寒冷", "type": "作战能力", "head": "199_yak"}, {"name": "灰喉", "pacts": ["精准"], "tier": 1, "n": "<获得时>【精准】层数+2", "e": "<获得时>【精准】层数+4", "type": "单次叠加", "head": "367_swllow"}, {"name": "深靛", "pacts": ["伊比利亚"], "tier": 1, "n": "<休整期结束时>使已激活的【伊比利亚】层数+2", "e": "<休整期结束时>使已激活的【伊比利亚】层数+4", "type": "持续叠加", "head": "469_indigo"}, {"name": "卡达", "pacts": ["奥术"], "tier": 1, "n": "<休整期结束时>使已激活的【奥术】层数+1", "e": "<休整期结束时>使已激活的【奥术】层数+2", "type": "持续叠加", "head": "328_cammou"}, {"name": "摆渡人", "pacts": ["坚守", "不屈"], "tier": 1, "n": "<获得时>【坚守】【不屈】层数+1", "e": "<获得时>【坚守】【不屈】层数+2", "type": "单次叠加", "head": "4166_varkis"}, {"name": "夏栎", "pacts": ["助力"], "tier": 1, "n": "<休整期结束时>使当前已激活且层数最多的盟约层数+1（此干员在整备区也生效）", "e": "<休整期结束时>使当前已激活且层数最多的盟约层数+2（此干员在整备区也生效）", "type": "持续叠加", "head": "492_quercu"}, {"name": "杰克", "pacts": ["突袭"], "tier": 1, "n": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）", "e": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）", "type": "作战能力", "head": "347_jaksel"}, {"name": "霜叶", "pacts": ["灵巧"], "tier": 1, "n": "<获得时>【灵巧】层数+2", "e": "<获得时>【灵巧】层数+4", "type": "单次叠加", "head": "193_frostl"}, {"name": "拜松", "pacts": ["炎"], "tier": 1, "n": "<获得时>【炎】层数+2", "e": "<获得时>【炎】层数+4", "type": "单次叠加", "head": "325_bison"}, {"name": "褐果", "pacts": ["聚合"], "tier": 1, "n": "<获得时>【聚合】层数+2", "e": "<获得时>【聚合】层数+4", "type": "单次叠加", "head": "4041_chnut"}, {"name": "烈夏", "pacts": ["乌萨斯"], "tier": 1, "n": "<战斗开始时>使已激活的【乌萨斯】临时层数+4", "e": "<战斗开始时>使已激活的【乌萨斯】临时层数+8", "type": "持续叠加", "head": "194_leto"}, {"name": "陨星", "pacts": ["迅捷"], "tier": 1, "n": "<战斗中>每次开启技能时使已激活的【迅捷】层数+1（每回合至多叠加2层）", "e": "<战斗中>每次开启技能时使已激活的【迅捷】层数+2（每回合至多叠加4层）", "type": "持续叠加", "head": "219_meteo"}, {"name": "拉普兰德", "pacts": ["叙拉古"], "tier": 1, "n": "<获得时>【叙拉古】层数+2", "e": "<获得时>【叙拉古】层数+4", "type": "单次叠加", "head": "140_whitew"}, {"name": "地灵", "pacts": ["莱塔尼亚", "独行"], "tier": 1, "n": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【莱塔尼亚】层数+1（每回合至多叠加1层）", "e": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【莱塔尼亚】层数+2（每回合至多叠加2层）", "type": "持续叠加", "head": "183_skgoat"}, {"name": "折光", "pacts": ["莱塔尼亚"], "tier": 2, "n": "<休整期结束时>使已激活的【莱塔尼亚】层数+4", "e": "<休整期结束时>使已激活的【莱塔尼亚】层数+8", "type": "持续叠加", "head": "499_kaitou"}, {"name": "蓝毒", "pacts": ["伊比利亚"], "tier": 2, "n": "<战斗中>【伊比利亚】每叠加2层，本干员攻击力+1%", "e": "<战斗中>【伊比利亚】每叠加1层，本干员攻击力+1%", "type": "作战能力", "head": "129_bluep"}, {"name": "泡泡", "pacts": ["萨尔贡", "坚守"], "tier": 2, "n": "<战斗中>每次开启技能时使已激活的【萨尔贡】【坚守】层数+2（每回合至多叠加4层）", "e": "<战斗中>每次开启技能时使已激活的【萨尔贡】【坚守】层数+4（每回合至多叠加8层）", "type": "持续叠加", "head": "381_bubble"}, {"name": "莎草", "pacts": ["萨尔贡", "聚合"], "tier": 2, "n": "<战斗中>每次开启技能时使身前干员回复2点技力", "e": "<战斗中>每次开启技能时使身前干员回复4点技力", "type": "作战能力", "head": "4139_papyrs"}, {"name": "雪猎", "pacts": ["谢拉格", "精准"], "tier": 2, "n": "<获得时>【谢拉格】【精准】层数+4", "e": "<获得时>【谢拉格】【精准】层数+8", "type": "单次叠加", "head": "4211_snhunt"}, {"name": "砾", "pacts": ["卡西米尔", "不屈"], "tier": 2, "n": "<战斗中>部署时使已激活的【卡西米尔】【不屈】层数+2（每场战斗至多叠加12层）", "e": "<战斗中>部署时使已激活的【卡西米尔】【不屈】层数+4（每场战斗至多叠加24层）", "type": "持续叠加", "head": "237_gravel"}, {"name": "复奏", "pacts": ["莱塔尼亚", "叙拉古", "奇迹"], "tier": 2, "n": "<刷新时>若为本回合首次主动刷新，使已激活的【莱塔尼亚】【叙拉古】层数+2（此干员在整备区也生效）", "e": "<刷新时>若为本回合首次主动刷新，使已激活的【莱塔尼亚】【叙拉古】层数+4（此干员在整备区也生效）", "type": "持续叠加", "head": "4031_liesel"}, {"name": "奥斯塔", "pacts": ["叙拉古"], "tier": 2, "n": "<获得时>获得一次免费刷新", "e": "<获得时>获得两次免费刷新", "type": "整备能力", "head": "346_aosta"}, {"name": "Miss.Christine", "pacts": ["维多利亚", "奥术"], "tier": 2, "n": "<休整期结束时>使已激活的【维多利亚】【奥术】层数+3", "e": "<休整期结束时>使已激活的【维多利亚】【奥术】层数+6", "type": "持续叠加", "head": "4198_christ"}, {"name": "哈洛德", "pacts": ["维多利亚", "谢拉格"], "tier": 2, "n": "<战斗中>【维多利亚】【谢拉格】每叠加5层，本干员攻击力+1%", "e": "<战斗中>【维多利亚】【谢拉格】每叠加5层，本干员攻击力+2%", "type": "作战能力", "head": "4114_harold"}, {"name": "云迹", "pacts": ["灵巧", "奇迹"], "tier": 2, "n": "<战斗中>每次开启技能时使自身已激活的盟约层数+3（每回合至多叠加6层）", "e": "<战斗中>每次开启技能时使自身已激活的盟约层数+6（每回合至多叠加12层）", "type": "持续叠加", "head": "4165_ctrail"}, {"name": "蛇屠箱", "pacts": ["坚守"], "tier": 2, "n": "<休整期结束时>使已激活的【坚守】层数+4", "e": "<休整期结束时>使已激活的【坚守】层数+8", "type": "持续叠加", "head": "150_snakek"}, {"name": "波登可", "pacts": ["聚合", "迅捷"], "tier": 2, "n": "<售出时>下回合额外获得1资金", "e": "<售出时>下回合额外获得2资金", "type": "整备能力", "head": "258_podego"}, {"name": "承曦格雷伊", "pacts": ["精准", "灵巧"], "tier": 2, "n": "<获得时>获得一件精准狙击镜", "e": "<获得时>获得两件精准狙击镜", "type": "整备能力", "head": "1027_greyy2"}, {"name": "锡人", "pacts": ["投资人"], "tier": 2, "n": "<获得时>【投资人】层数+4", "e": "<获得时>【投资人】层数+8", "type": "单次叠加", "head": "4151_tinman"}, {"name": "宴", "pacts": ["不屈"], "tier": 2, "n": "<获得时>【不屈】层数+4", "e": "<获得时>【不屈】层数+8", "type": "单次叠加", "head": "337_utage"}, {"name": "渡桥", "pacts": ["远见"], "tier": 2, "n": "<休整期结束时>使自身及身前一名干员已激活的盟约层数+2", "e": "<休整期结束时>使自身及身前一名干员已激活的盟约层数+4", "type": "持续叠加", "head": "4147_mitm"}, {"name": "矩", "pacts": ["炎"], "tier": 2, "n": "<获得时>获得等同于当前调度中心等级的【炎】层数", "e": "<获得时>获得等同于当前调度中心等级两倍的【炎】层数", "type": "单次叠加", "head": "4221_ju"}, {"name": "星极", "pacts": ["奇迹"], "tier": 2, "n": "只需两名本干员即可合成精锐", "e": "只需两名本干员即可合成精锐", "type": "作战能力", "head": "274_astesi"}, {"name": "瑰盐", "pacts": ["伊比利亚", "聚合"], "tier": 2, "n": "<战斗中>【伊比利亚】每叠加3层，本干员攻击力+1%", "e": "<战斗中>【伊比利亚】每叠加3层，本干员攻击力+2%", "type": "作战能力", "head": "4163_rosesa"}, {"name": "真理", "pacts": ["乌萨斯"], "tier": 2, "n": "购买价格为1", "e": "购买价格为1", "type": "整备能力", "head": "195_glassb"}, {"name": "铸铁", "pacts": ["突袭"], "tier": 2, "n": "<休整期结束时>使已激活的【突袭】层数+3", "e": "<休整期结束时>使已激活的【突袭】层数+6", "type": "持续叠加", "head": "333_sidero"}, {"name": "星源", "pacts": ["助力"], "tier": 2, "n": "<休整期结束时>使当前已激活且层数最多的盟约层数+2（此干员在整备区也生效）", "e": "<休整期结束时>使当前已激活且层数最多的盟约层数+4（此干员在整备区也生效）", "type": "持续叠加", "head": "135_halo"}, {"name": "安哲拉", "pacts": ["阿戈尔", "助力"], "tier": 2, "n": "<战斗中>每击倒一名敌人或我方干员使已激活的【阿戈尔】【助力】层数+3（每回合至多叠加9层）", "e": "<战斗中>每击倒一名敌人或我方干员使已激活的【阿戈尔】【助力】层数+6（每回合至多叠加18层）", "type": "持续叠加", "head": "218_cuttle"}, {"name": "车尔尼", "pacts": ["莱塔尼亚", "坚守"], "tier": 3, "n": "<获得时>获得一件“莱塔尼亚小鼓”", "e": "<获得时>获得两件“莱塔尼亚小鼓”", "type": "整备能力", "head": "4047_pianst"}, {"name": "卡涅利安", "pacts": ["莱塔尼亚", "萨尔贡", "迅捷"], "tier": 3, "n": "<获得时>获得一件“迅捷作战粮”", "e": "<获得时>获得两件“迅捷作战粮”", "type": "整备能力", "head": "426_billro"}, {"name": "乌啾", "pacts": ["乌萨斯", "聚合"], "tier": 3, "n": "<进入休整期时>场上每有一名【乌萨斯】干员，转化1层【乌萨斯】临时层数为固定层数", "e": "<进入休整期时>场上每有一名【乌萨斯】干员，转化2层【乌萨斯】临时层数为固定层数", "type": "持续叠加", "head": "4224_turdus"}, {"name": "海沫", "pacts": ["伊比利亚", "不屈"], "tier": 3, "n": "<休整期结束时>自身售出价格+1（自身售出价格至多为4）", "e": "<休整期结束时>自身售出价格+2（自身售出价格至多为8）", "type": "整备能力", "head": "4066_highmo"}, {"name": "旅骨", "pacts": ["伊比利亚", "精准"], "tier": 3, "n": "<休整期结束时>使自身及身前一名干员已激活的盟约叠加等同于其售出价格的层数", "e": "<休整期结束时>使自身及身前一名干员已激活的盟约叠加等同于其售出价格2倍的层数", "type": "持续叠加", "head": "4232_hbound"}, {"name": "风絮", "pacts": ["炎", "聚合"], "tier": 3, "n": "<休整期结束时>本回合每获得一名干员，使已激活的【炎】【聚合】层数+2（每回合至多叠加16层）", "e": "<休整期结束时>本回合每获得一名干员，使已激活的【炎】【聚合】层数+4（每回合至多叠加32层）", "type": "持续叠加", "head": "4222_taraxa"}, {"name": "极光", "pacts": ["谢拉格"], "tier": 3, "n": "<获得时>【谢拉格】层数+1（每次触发后升级，至多叠加12层）", "e": "<获得时>【谢拉格】层数+1（每次触发后升级，至多叠加12层）", "type": "单次叠加", "head": "422_aurora"}, {"name": "耶拉", "pacts": ["谢拉格", "奇迹"], "tier": 3, "n": "<获得时>获得一件“谢拉格不融冰”", "e": "<获得时>获得两件“谢拉格不融冰”", "type": "整备能力", "head": "4013_kjera"}, {"name": "初雪", "pacts": ["谢拉格", "协防干员"], "tier": 3, "n": "<战斗中>攻击范围内每有一名敌人进入冻结使已激活的【谢拉格】层数+1（每回合至多叠加16层）", "e": "<战斗中>攻击范围内每有一名敌人进入冻结使已激活的【谢拉格】层数+2（每回合至多叠加32层）", "type": "持续叠加", "head": "174_slbell"}, {"name": "深巡", "pacts": ["阿戈尔", "坚守"], "tier": 3, "n": "<战斗中>部署时【阿戈尔】盟约每叠加20层，使自身及周围四格的干员攻击速度+1，持续30秒", "e": "<战斗中>部署时【阿戈尔】盟约每叠加10层，使自身及周围四格的干员攻击速度+1，持续30秒", "type": "作战能力", "head": "4137_udflow"}, {"name": "斯卡蒂", "pacts": ["阿戈尔", "突袭"], "tier": 3, "n": "<战斗中>部署时使已激活的【阿戈尔】层数+4（每场战斗至多叠加8层）", "e": "<战斗中>部署时使已激活的【阿戈尔】层数+8（每场战斗至多叠加16层）", "type": "持续叠加", "head": "263_skadi"}, {"name": "瑕光", "pacts": ["卡西米尔", "突袭"], "tier": 3, "n": "<战斗中>部署时使自身已激活的盟约层数+3（每场战斗至多叠加9层）", "e": "<战斗中>部署时使自身已激活的盟约层数+6（每场战斗至多叠加18层）", "type": "持续叠加", "head": "423_blemsh"}, {"name": "忍冬", "pacts": ["叙拉古", "迅捷"], "tier": 3, "n": "<获得时>获得1次免费刷新（触发2次后升级，至多获得3次免费刷新）", "e": "<获得时>获得1次免费刷新（触发2次后升级，至多获得3次免费刷新）", "type": "整备能力", "head": "4026_vulpis"}, {"name": "伺夜", "pacts": ["叙拉古", "精准"], "tier": 3, "n": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）；每击倒一名敌人使已激活的【叙拉古】【精准】层数+2（每回合至多叠加8层）", "e": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）；每击倒一名敌人使已激活的【叙拉古】【精准】层数+4（每回合至多叠加16层）", "type": "持续叠加", "head": "427_vigil"}, {"name": "水灯心", "pacts": ["维多利亚", "独行", "灵巧"], "tier": 3, "n": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）", "e": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）", "type": "作战能力", "head": "4177_brigid"}, {"name": "空弦", "pacts": ["精准", "远见"], "tier": 3, "n": "<进入休整期时>使自身及身前一名干员已激活的盟约层数+3", "e": "<进入休整期时>使自身及身前一名干员已激活的盟约层数+6", "type": "持续叠加", "head": "332_archet"}, {"name": "吉星", "pacts": ["奇迹"], "tier": 3, "n": "<售出时>进行一次I阶干员的免费特殊招募，本干员合成为精锐状态后，上述特殊招募变为V阶干员", "e": "<售出时>进行一次V阶干员的免费特殊招募", "type": "整备能力", "head": "4203_kichi"}, {"name": "伊桑", "pacts": ["奥术", "突袭"], "tier": 3, "n": "<售出时>随机获得一名当前人数最多盟约的干员（不高于当前调度中心等级；无法获得自身）", "e": "<售出时>随机获得一名当前人数最多盟约的干员（不高于当前调度中心等级；无法获得自身）", "type": "整备能力", "head": "355_ethan"}, {"name": "罗比菈塔", "pacts": ["坚守", "助力"], "tier": 3, "n": "<休整期结束时>同一行每有1名干员，使已激活的【坚守】【助力】层数+2", "e": "<休整期结束时>同一行每有1名干员，使已激活的【坚守】【助力】层数+4", "type": "持续叠加", "head": "484_robrta"}, {"name": "乌有", "pacts": ["炎"], "tier": 3, "n": "<获得时>获得一枚“盟约之币”", "e": "<获得时>获得两枚“盟约之币”", "type": "整备能力", "head": "455_nothin"}, {"name": "历阵锐枪芬", "pacts": ["卡西米尔", "远见"], "tier": 3, "n": "<战斗中>被击倒时召唤整备区的一名【卡西米尔】干员（优先选择最右侧）上场，并使整备区干员的当前再部署时间-30%", "e": "<战斗中>被击倒时召唤整备区的一名【卡西米尔】干员（优先选择最右侧）上场，并使整备区干员的当前再部署时间-60%", "type": "作战能力", "head": "1036_fang2"}, {"name": "凯瑟琳", "pacts": ["维多利亚", "远见"], "tier": 3, "n": "<获得时>获得一件维式重锤，小概率获得特殊维式重锤", "e": "<获得时>获得一件特殊维式重锤，小概率获得终极维式重锤", "type": "整备能力", "head": "4162_cathy"}, {"name": "盟约·辅助干员", "pacts": ["调和"], "tier": 3, "n": "<战斗中>攻击力和生命上限+20%", "e": "<战斗中>攻击力和生命上限+40%", "type": "作战能力", "head": "616_pithst"}, {"name": "风丸", "pacts": ["不屈"], "tier": 3, "n": "<战斗中>自身被击倒或与傀儡发生替换时使已激活的【不屈】层数+2（每回合至多叠加10层）", "e": "<战斗中>自身被击倒或与傀儡发生替换时使已激活的【不屈】层数+4（每回合至多叠加20层）", "type": "持续叠加", "head": "4016_kazema"}, {"name": "至简", "pacts": ["萨尔贡"], "tier": 3, "n": "购买价格为1", "e": "购买价格为1", "type": "整备能力", "head": "4054_malist"}, {"name": "奥尔佳", "pacts": ["乌萨斯", "灵巧"], "tier": 3, "n": "<获得时>获得一件乌萨斯呼吸器", "e": "<获得时>获得两件乌萨斯呼吸器", "type": "整备能力", "head": "4245_alga"}, {"name": "青枳", "pacts": ["坚守", "迅捷"], "tier": 3, "n": "<进入休整期时>使自身及身后一格干员已激活的盟约层数+3", "e": "<进入休整期时>使自身及身后一格干员已激活的盟约层数+6", "type": "持续叠加", "head": "488_buildr"}, {"name": "黑键", "pacts": ["莱塔尼亚", "精准"], "tier": 4, "n": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【莱塔尼亚】【精准】层数+1（每回合至多叠加8层）", "e": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【莱塔尼亚】【精准】层数+2（每回合至多叠加16层）", "type": "持续叠加", "head": "4046_ebnhlz"}, {"name": "艾雅法拉", "pacts": ["莱塔尼亚", "奥术"], "tier": 4, "n": "<战斗中>【莱塔尼亚】【奥术】每叠加2层，本干员技力自然回复速度+0.02/秒，攻击力+1%", "e": "<战斗中>【莱塔尼亚】【奥术】每叠加1层，本干员技力自然回复速度+0.02/秒，攻击力+1%", "type": "作战能力", "head": "180_amgoat"}, {"name": "赫拉格", "pacts": ["乌萨斯", "突袭"], "tier": 4, "n": "<战斗中>部署时使已激活的【乌萨斯】【突袭】层数+4（每场战斗至多叠加12层）", "e": "<战斗中>部署时使已激活的【乌萨斯】【突袭】层数+8（每场战斗至多叠加24层）", "type": "持续叠加", "head": "188_helage"}, {"name": "维伊", "pacts": ["乌萨斯", "奥术"], "tier": 4, "n": "<战斗中>【乌萨斯】每叠加2层，本干员攻击速度+1", "e": "<战斗中>【乌萨斯】每叠加1层，本干员攻击速度+1", "type": "作战能力", "head": "4226_veen"}, {"name": "温蒂", "pacts": ["伊比利亚", "坚守"], "tier": 4, "n": "售出价格为3", "e": "售出价格为6", "type": "整备能力", "head": "400_weedy"}, {"name": "流明", "pacts": ["伊比利亚", "聚合"], "tier": 4, "n": "<战斗结束时>每有一名存活的敌方干员，使已激活的【伊比利亚】【聚合】层数+1", "e": "<战斗结束时>每有一名存活的敌方干员，使已激活的【伊比利亚】【聚合】层数+2", "type": "持续叠加", "head": "4042_lumen"}, {"name": "余", "pacts": ["炎", "坚守"], "tier": 4, "n": "<战斗中>周围八格每有一名敌人触发元素损伤爆发使自身已激活的盟约层数+1（每回合至多叠加8层）", "e": "<战斗中>周围八格每有一名敌人触发元素损伤爆发使自身已激活的盟约层数+2（每回合至多叠加16层）", "type": "持续叠加", "head": "2026_yu"}, {"name": "森蚺", "pacts": ["萨尔贡", "不屈"], "tier": 4, "n": "<战斗中>部署时使已激活的【萨尔贡】【不屈】盟约层数+4（每回合至多叠加12层）", "e": "<战斗中>部署时使已激活的【萨尔贡】【不屈】盟约层数+8（每回合至多叠加24层）", "type": "持续叠加", "head": "416_zumama"}, {"name": "灵知", "pacts": ["谢拉格", "迅捷"], "tier": 4, "n": "<获得时>获得一次特殊刷新，下次刷新至少出现一名谢拉格干员", "e": "<获得时>获得一次特殊刷新，下次刷新至少出现两名谢拉格干员", "type": "整备能力", "head": "206_gnosis"}, {"name": "归溟幽灵鲨", "pacts": ["阿戈尔", "不屈"], "tier": 4, "n": "<战斗中>自身被击倒或与替身发生替换时使周围八格的【阿戈尔】干员回复5点技力", "e": "<战斗中>自身被击倒或与替身发生替换时使周围八格的【阿戈尔】干员回复10点技力", "type": "作战能力", "head": "1023_ghost2"}, {"name": "水月", "pacts": ["阿戈尔", "灵巧"], "tier": 4, "n": "<战斗中>【阿戈尔】盟约每叠加20层，自身及周围四格干员每次造成伤害时使目标移动速度-1%，持续3秒", "e": "<战斗中>【阿戈尔】盟约每叠加10层，自身及周围四格干员每次造成伤害时使目标移动速度-1%，持续3秒", "type": "作战能力", "head": "437_mizuki"}, {"name": "远牙", "pacts": ["卡西米尔", "精准"], "tier": 4, "n": "<战斗中>攻击范围内每有一名敌人被击倒使攻击范围内及整备区中的干员再部署时间-3秒", "e": "<战斗中>攻击范围内每有一名敌人被击倒使攻击范围内及整备区中的干员再部署时间-6秒", "type": "作战能力", "head": "430_fartth"}, {"name": "玛恩纳", "pacts": ["卡西米尔"], "tier": 4, "n": "<战斗中>【卡西米尔】每叠加5层，本干员部署后100秒内基础攻击力+10、基础生命上限+50", "e": "<战斗中>【卡西米尔】每叠加5层，本干员部署后100秒内基础攻击力+20、基础生命上限+100", "type": "作战能力", "head": "4064_mlynar"}, {"name": "涤火杰西卡", "pacts": ["维多利亚", "坚守"], "tier": 4, "n": "<休整期结束时>场上每有一名携带装备的干员，使已激活的【维多利亚】【坚守】层数+2", "e": "<休整期结束时>场上每有一名携带装备的干员，使已激活的【维多利亚】【坚守】层数+4", "type": "持续叠加", "head": "1034_jesca2"}, {"name": "白铁", "pacts": ["维多利亚", "助力"], "tier": 4, "n": "<进入休整期时>使自身携带的装备变为精锐版本", "e": "<进入休整期时>使自身携带的装备变为精锐版本", "type": "整备能力", "head": "4072_ironmn"}, {"name": "斥罪", "pacts": ["叙拉古", "不屈"], "tier": 4, "n": "<战斗中>【叙拉古】【不屈】每叠加3层，本干员攻击力+1%", "e": "<战斗中>【叙拉古】【不屈】每叠加3层，本干员攻击力+2%", "type": "作战能力", "head": "4065_judge"}, {"name": "W", "pacts": ["迅捷"], "tier": 4, "n": "<战斗中>【迅捷】每叠加3层，本干员攻击力+1%", "e": "<战斗中>【迅捷】每叠加3层，本干员攻击力+2%", "type": "作战能力", "head": "113_cqbw"}, {"name": "霍尔海雅", "pacts": ["奥术", "精准"], "tier": 4, "n": "<战斗中>每次开启技能时使自身已激活的盟约层数+4（每场战斗至多叠加12层）", "e": "<战斗中>每次开启技能时使自身已激活的盟约层数+8（每场战斗至多叠加24层）", "type": "持续叠加", "head": "4027_heyak"}, {"name": "山", "pacts": ["投资人"], "tier": 4, "n": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）", "e": "<战斗中>造成的伤害变为弱点伤害（根据敌人的防御力与法术抗性变换伤害类型）", "type": "作战能力", "head": "264_f12yin"}, {"name": "淬羽赫默", "pacts": ["助力"], "tier": 4, "n": "<休整期结束时>使整备区每名干员已激活的盟约层数+1", "e": "<休整期结束时>使整备区每名干员已激活的盟约层数+2", "type": "持续叠加", "head": "1031_slent2"}, {"name": "赫德雷", "pacts": ["突袭"], "tier": 4, "n": "<战斗中>部署时使已激活的【突袭】层数+4（每回合至多叠加16层）", "e": "<战斗中>部署时使已激活的【突袭】层数+8（每回合至多叠加32层）", "type": "持续叠加", "head": "4088_hodrer"}, {"name": "夜莺", "pacts": ["聚合", "协防干员"], "tier": 4, "n": "<战斗结束时>每有一名存活的我方干员，使自身已激活的盟约层数+1", "e": "<战斗结束时>每有一名存活的我方干员，使自身已激活的盟约层数+2", "type": "持续叠加", "head": "179_cgbird"}, {"name": "仇白", "pacts": ["炎", "灵巧"], "tier": 4, "n": "<获得时>【炎】【灵巧】层数+6", "e": "<获得时>【炎】【灵巧】层数+12", "type": "单次叠加", "head": "4082_qiubai"}, {"name": "异客", "pacts": ["萨尔贡", "奥术"], "tier": 4, "n": "<进入休整期时>获得1件“盟约之币”或“萨尔贡浓茶”，有小概率发现“拟态物质”", "e": "<进入休整期时>获得2件“盟约之币”或“萨尔贡浓茶”，有小概率发现“拟态物质”", "type": "整备能力", "head": "472_pasngr"}, {"name": "安洁莉娜", "pacts": ["叙拉古", "奇迹"], "tier": 4, "n": "<休整期结束时>本回合每进行过1次刷新，使已激活的【叙拉古】层数+2（每回合至多叠加8层），【奇迹】层数+1（每回合至多叠加4层）", "e": "<休整期结束时>本回合每进行过1次刷新，使已激活的【叙拉古】层数+4（每回合至多叠加16层），【奇迹】层数+2（每回合至多叠加8层）", "type": "持续叠加", "head": "291_aglina"}, {"name": "华法琳", "pacts": ["灵巧", "聚合"], "tier": 4, "n": "<战斗开始时>使身前一名干员获得特质“<开启技能时>使自身已激活的盟约层数+1（每回合至多叠加7层）”", "e": "<战斗开始时>使身前一名干员获得特质“<开启技能时>使自身已激活的盟约层数+2（每回合至多叠加14层）”", "type": "持续叠加", "head": "171_bldsk"}, {"name": "寒檀", "pacts": ["远见"], "tier": 4, "n": "<休整期结束时><休整期开始时>使已激活的【远见】层数+3", "e": "<休整期结束时><休整期开始时>使已激活的【远见】层数+6", "type": "持续叠加", "head": "341_sntlla"}, {"name": "纯烬艾雅法拉", "pacts": ["聚合", "莱塔尼亚", "远见"], "tier": 5, "n": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【莱塔尼亚】【聚合】层数+2（每场战斗至多叠加20层）", "e": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【莱塔尼亚】【聚合】层数+4（每场战斗至多叠加40层）", "type": "持续叠加", "head": "1016_agoat2"}, {"name": "怒潮凛冬", "pacts": ["乌萨斯", "奇迹"], "tier": 5, "n": "<战斗中>【乌萨斯】【奇迹】每叠加10层，本干员技力自然回复速度+0.1/秒，攻击力+1%", "e": "<战斗中>【乌萨斯】【奇迹】每叠加10层，本干员技力自然回复速度+0.2/秒，攻击力+2%", "type": "作战能力", "head": "1051_headb2"}, {"name": "艾丽妮", "pacts": ["伊比利亚"], "tier": 5, "n": "<战斗中>周围12格每有一名敌人被击倒自身回复3点技力", "e": "<战斗中>周围12格每有一名敌人被击倒自身回复6点技力", "type": "作战能力", "head": "4009_irene"}, {"name": "棘刺", "pacts": ["伊比利亚", "奥术"], "tier": 5, "n": "<休整期结束时>使已激活的【伊比利亚】叠加等同于场上所有干员售出价格的层数（每回合至多叠加12层）", "e": "<休整期结束时>使已激活的【伊比利亚】叠加等同于场上所有干员售出价格2倍的层数（每回合至多叠加24层）", "type": "持续叠加", "head": "293_thorns"}, {"name": "黍", "pacts": ["炎", "远见"], "tier": 5, "n": "<获得时>【炎】层数+8，【远见】层数+4", "e": "<获得时>【炎】层数+16，【远见】层数+8", "type": "单次叠加", "head": "2025_shu"}, {"name": "佩佩", "pacts": ["萨尔贡", "灵巧"], "tier": 5, "n": "<战斗中>周围八格每有一名敌人或干员进入沉睡或眩晕时使自身及身后一格干员已激活的盟约层数+1（每回合至多叠加9层）", "e": "<战斗中>周围八格每有一名敌人或干员进入沉睡或眩晕时使自身及身后一格干员已激活的盟约层数+2（每回合至多叠加18层）", "type": "持续叠加", "head": "4058_pepe"}, {"name": "圣聆初雪", "pacts": ["谢拉格", "奥术"], "tier": 5, "n": "<战斗中>攻击范围内每有一名敌人陷入冻结自身回复1点技力，并使已激活的【谢拉格】层数+1（每回合至多叠加24层）", "e": "<战斗中>攻击范围内每有一名敌人陷入冻结自身回复2点技力，并使已激活的【谢拉格】层数+2（每回合至多叠加48层）", "type": "持续叠加", "head": "1046_sbell2"}, {"name": "凛御银灰", "pacts": ["谢拉格", "灵巧", "投资人"], "tier": 5, "n": "<战斗中>身前一名【谢拉格】【灵巧】干员每场战斗的叠加上限+75%", "e": "<战斗中>身前一名【谢拉格】【灵巧】干员每场战斗的叠加上限+150%", "type": "持续叠加", "head": "1045_svash2"}, {"name": "歌蕾蒂娅", "pacts": ["阿戈尔"], "tier": 5, "n": "<进入休整期时>若同一行有3名干员，获得1个幽灵鲨、安哲拉、深巡或斯卡蒂", "e": "<进入休整期时>获得1个幽灵鲨、安哲拉、深巡或斯卡蒂", "type": "整备能力", "head": "474_glady"}, {"name": "乌尔比安", "pacts": ["阿戈尔"], "tier": 5, "n": "<战斗中>部署时【阿戈尔】盟约每叠加20层，使自身及周围四格的干员攻击力+1%，持续30秒", "e": "<战斗中>部署时【阿戈尔】盟约每叠加10层，使自身及周围四格的干员攻击力+1%，持续30秒", "type": "作战能力", "head": "4145_ulpia"}, {"name": "薇薇安娜", "pacts": ["莱塔尼亚", "卡西米尔", "奥术"], "tier": 5, "n": "<战斗中>场上其他与自身拥有相同盟约的干员在本回合战斗期的叠加上限+7", "e": "<战斗中>场上其他与自身拥有相同盟约的干员在本回合战斗期的叠加上限+14", "type": "持续叠加", "head": "4098_vvana"}, {"name": "铃兰", "pacts": ["叙拉古"], "tier": 5, "n": "<进入休整期时>触发身前两格的其他干员的“获得时”类效果", "e": "<进入休整期时>触发身前两格的其他干员的“获得时”类效果", "type": "特异化", "head": "358_lisa"}, {"name": "贝洛内", "pacts": ["叙拉古", "突袭"], "tier": 5, "n": "<战斗中>【叙拉古】【突袭】每叠加3层，本干员攻击力+1%", "e": "<战斗中>【叙拉古】【突袭】每叠加3层，本干员攻击力+2%", "type": "作战能力", "head": "4037_demetr"}, {"name": "维娜·维多利亚", "pacts": ["维多利亚", "奇迹"], "tier": 5, "n": "<休整期结束时>场上每有一名不同阶的【维多利亚】干员，使已激活的【维多利亚】【奇迹】层数+2", "e": "<休整期结束时>场上每有一名不同阶的【维多利亚】干员，使已激活的【维多利亚】【奇迹】层数+4", "type": "持续叠加", "head": "1019_siege2"}, {"name": "迷迭香", "pacts": ["精准", "助力"], "tier": 5, "n": "<休整期结束时>使已激活的【精准】【助力】层数+10", "e": "<休整期结束时>使已激活的【精准】【助力】层数+20", "type": "持续叠加", "head": "391_rosmon"}, {"name": "隐德来希", "pacts": ["灵巧", "不屈"], "tier": 5, "n": "<战斗中>【灵巧】【不屈】每叠加3层，本干员攻击力+1%", "e": "<战斗中>【灵巧】【不屈】每叠加3层，本干员攻击力+2%", "type": "作战能力", "head": "4010_etlchi"}, {"name": "塞雷娅", "pacts": ["坚守", "协防干员"], "tier": 5, "n": "身前一名干员若为“休整期结束时”特质，本干员的特质与其相同", "e": "身前一名干员若为“休整期结束时”特质，本干员的特质与其相同", "type": "特异化", "head": "202_demkni"}, {"name": "溯光星源", "pacts": ["奥术"], "tier": 5, "n": "<休整期结束时>本回合每消耗3资金，使已激活的【奥术】层数+2（每回合至多叠加18层）", "e": "<休整期结束时>本回合每消耗3资金，使已激活的【奥术】层数+4（每回合至多叠加36层）", "type": "持续叠加", "head": "1047_halo2"}, {"name": "老鲤", "pacts": ["投资人", "炎"], "tier": 5, "n": "<战斗中>【炎】【投资人】每叠加3层，本干员攻击力+1%", "e": "<战斗中>【炎】【投资人】每叠加3层，本干员攻击力+2%", "type": "作战能力", "head": "322_lmlee"}, {"name": "Mon3tr", "pacts": ["协防干员"], "tier": 5, "n": "<战斗中>周围八格干员每场战斗的叠加上限+30%", "e": "<战斗中>周围八格干员每场战斗的叠加上限+60%", "type": "持续叠加", "head": "4179_monstr"}, {"name": "可露希尔", "pacts": ["投资人"], "tier": 5, "n": "<休整期结束时>本回合每获得过一名干员，使已激活的【投资人】层数+2（每回合至多叠加16层）", "e": "<休整期结束时>本回合每获得过一名干员，使已激活的【投资人】层数+4（每回合至多叠加32层）", "type": "持续叠加", "head": "4228_closur"}, {"name": "“暴躁铁皮”", "pacts": ["协防干员"], "tier": 5, "n": "<战斗中>攻击力和生命上限+60%", "e": "<战斗中>攻击力和生命上限+120%", "type": "作战能力", "head": "618_acrbot"}, {"name": "鸿雪", "pacts": ["萨尔贡", "精准"], "tier": 5, "n": "<战斗中>每次开启技能时使已激活的【萨尔贡】【精准】层数+4（每回合至多叠加16层）", "e": "<战斗中>每次开启技能时使已激活的【萨尔贡】【精准】层数+8（每回合至多叠加32层）", "type": "持续叠加", "head": "4055_bgsnow"}, {"name": "焰尾", "pacts": ["卡西米尔", "迅捷"], "tier": 5, "n": "<休整期结束时>整备区每有一名干员，使已激活的【卡西米尔】【迅捷】层数+1", "e": "<休整期结束时>整备区每有一名干员，使已激活的【卡西米尔】【迅捷】层数+2", "type": "持续叠加", "head": "420_flamtl"}, {"name": "冻河", "pacts": ["乌萨斯", "迅捷"], "tier": 5, "n": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【乌萨斯】【迅捷】层数+1（每场战斗至多叠加16层）", "e": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【乌萨斯】【迅捷】层数+2（每场战斗至多叠加32层）", "type": "持续叠加", "head": "4244_tocka"}, {"name": "阿米娅", "pacts": ["奇迹"], "tier": 5, "n": "<战斗中>身前一名干员提升盟约层数时，每次提升的层数额外+1（不受叠加上限影响）", "e": "<战斗中>身前一名干员提升盟约层数时，每次提升的层数额外+2（不受叠加上限影响）", "type": "持续叠加", "head": "002_amiya"}, {"name": "引星棘刺", "pacts": ["伊比利亚", "迅捷"], "tier": 6, "n": "<休整期结束时>使已激活的【伊比利亚】【迅捷】层数+12", "e": "<休整期结束时>使已激活的【伊比利亚】【迅捷】层数+24", "type": "持续叠加", "head": "1039_thorn2"}, {"name": "烛煌", "pacts": ["炎", "维多利亚", "迅捷"], "tier": 6, "n": "<战斗中>攻击范围内每有一名敌人触发元素损伤爆发使已激活的【炎】【维多利亚】层数+1（每回合至多叠加12层）", "e": "<战斗中>攻击范围内每有一名敌人触发元素损伤爆发使已激活的【炎】【维多利亚】层数+2（每回合至多叠加24层）", "type": "持续叠加", "head": "1040_blaze2"}, {"name": "浊心斯卡蒂", "pacts": ["阿戈尔", "聚合"], "tier": 6, "n": "<战斗中>攻击范围内每有一名我方干员部署使已激活的【阿戈尔】层数+2（每场战斗至多叠加20层）", "e": "<战斗中>攻击范围内每有一名我方干员部署使已激活的【阿戈尔】层数+4（每场战斗至多叠加40层）", "type": "持续叠加", "head": "1012_skadi2"}, {"name": "克莱门莎", "pacts": ["阿戈尔"], "tier": 6, "n": "<战斗开始时>【阿戈尔】盟约每叠加20层，使场上所有敌人侵蚀损伤冷却恢复速度+1%", "e": "<战斗开始时>【阿戈尔】盟约每叠加10层，使场上所有敌人侵蚀损伤冷却恢复速度+1%", "type": "作战能力", "head": "4231_clemnt"}, {"name": "耀骑士临光", "pacts": ["卡西米尔", "突袭"], "tier": 6, "n": "<战斗中>被击倒时召唤整备区最右侧的【卡西米尔】【突袭】干员上场，并使自身及被召唤干员已激活的盟约层数+6（每名干员每回合至多叠加12层）", "e": "<战斗中>被击倒时召唤整备区最右侧的【卡西米尔】【突袭】干员上场，并使自身及被召唤干员已激活的盟约层数+12（每名干员每回合至多叠加24层）", "type": "持续叠加", "head": "1014_nearl2"}, {"name": "荒芜拉普兰德", "pacts": ["叙拉古"], "tier": 6, "n": "<战斗中>每击倒一名敌人使已激活的【叙拉古】层数+2（每场战斗至多叠加20层）（晋升为精锐状态时，使所有【叙拉古】干员获得此效果）", "e": "<战斗中>所有【叙拉古】干员每击倒一名敌人使已激活的【叙拉古】层数+4（每场战斗至多叠加40层）", "type": "持续叠加", "head": "1038_whitw2"}, {"name": "酒神", "pacts": ["维多利亚"], "tier": 6, "n": "<进入休整期时>获得一件随机装备（不高于当前调度中心等级）", "e": "<进入休整期时>获得两件随机装备（不高于当前调度中心等级）", "type": "整备能力", "head": "1042_phatm2"}, {"name": "逻各斯", "pacts": ["奥术", "远见"], "tier": 6, "n": "<获得时>【奥术】层数+10，【远见】层数+5<战斗中>【奥术】【远见】每叠加3层，本干员攻击速度+1", "e": "<获得时>【奥术】层数+20，【远见】层数+10<战斗中>【奥术】【远见】每叠加3层，本干员攻击速度+2", "type": "持续叠加", "head": "4133_logos"}, {"name": "真言", "pacts": ["萨尔贡"], "tier": 6, "n": "<战斗中>【萨尔贡】每叠加5层，本干员攻击力+1%", "e": "<战斗中>【萨尔贡】每叠加5层，本干员攻击力+2%", "type": "作战能力", "head": "4204_mantra"}, {"name": "妮芙", "pacts": ["迅捷", "远见"], "tier": 6, "n": "<战斗中>攻击范围内每有一名敌人陷入恐惧使已激活的【迅捷】层数+4（每回合至多叠加20层）", "e": "<战斗中>攻击范围内每有一名敌人陷入恐惧使已激活的【迅捷】层数+8（每回合至多叠加40层）", "type": "持续叠加", "head": "4146_nymph"}, {"name": "遥", "pacts": ["聚合", "奇迹"], "tier": 6, "n": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【聚合】【奇迹】层数+1（每回合至多叠加12层）", "e": "<战斗中>攻击范围内每有一名敌人被击倒使已激活的【聚合】【奇迹】层数+2（每回合至多叠加24层）", "type": "持续叠加", "head": "4202_haruka"}, {"name": "魔王", "pacts": ["调和"], "tier": 6, "n": "<休整期结束时>使已激活的核心盟约层数+10", "e": "<休整期结束时>使已激活的核心盟约层数+20", "type": "持续叠加", "head": "4134_cetsyr"}, {"name": "史尔特尔", "pacts": ["突袭", "不屈"], "tier": 6, "n": "<战斗中>每击倒一名敌人使已激活的【突袭】【不屈】层数+4（每回合至多叠加16层）", "e": "<战斗中>每击倒一名敌人使已激活的【突袭】【不屈】层数+8（每回合至多叠加32层）", "type": "持续叠加", "head": "350_surtr"}, {"name": "锏", "pacts": ["卡西米尔", "谢拉格", "莱塔尼亚"], "tier": 6, "n": "<战斗中>【卡西米尔】【谢拉格】【莱塔尼亚】每叠加6层，本干员技力自然回复速度+0.01/秒，生命上限+1%", "e": "<战斗中>【卡西米尔】【谢拉格】【莱塔尼亚】每叠加3层，本干员技力自然回复速度+0.01/秒，生命上限+1%", "type": "作战能力", "head": "4116_blkkgt"}, {"name": "机械师", "pacts": ["协防干员", "坚守"], "tier": 6, "n": "<进入休整期时>若同一行至少有三名干员，获得一名当前人数最多盟约的干员", "e": "<进入休整期时>获得一名当前人数最多盟约的干员", "type": "整备能力", "head": "4230_mcnist"}, {"name": "塔露拉", "pacts": ["乌萨斯", "奥术", "协防干员"], "tier": 6, "n": "<战斗中>【乌萨斯】盟约获得强化：击倒单位时叠加的临时层数提升至4层；在场6名不同【乌萨斯】干员时，提升至6层", "e": "<战斗中>【乌萨斯】盟约获得强化：击倒单位时叠加的临时层数提升至6层；在场6名不同【乌萨斯】干员时，提升至8层", "type": "持续叠加", "head": "4247_oxi"}, {"name": "夕", "pacts": ["炎", "奥术"], "tier": 6, "n": "<休整期结束时>本回合每获得过一名干员，使已激活的【炎】【奥术】层数+2（每回合至多叠加24层）", "e": "<休整期结束时>本回合每获得过一名干员，使已激活的【炎】【奥术】层数+4（每回合至多叠加48层）", "type": "持续叠加", "head": "2015_dusk"}, {"name": "蕾缪安", "pacts": ["精准"], "tier": 6, "n": "<战斗中>【精准】每叠加4层，本干员技力自然回复速度+0.01/秒", "e": "<战斗中>【精准】每叠加2层，本干员技力自然回复速度+0.01/秒", "type": "作战能力", "head": "4193_lemuen"}, {"name": "缪尔赛思", "pacts": ["协防干员"], "tier": 6, "n": "<获得时>获得一个“变形同构体”", "e": "<获得时>获得两个“变形同构体”", "type": "整备能力", "head": "249_mlyss"}, {"name": "帕拉斯", "pacts": ["灵巧", "助力"], "tier": 6, "n": "<休整期结束时>使自身以及身前一名干员已激活的盟约层数+9", "e": "<休整期结束时>使自身以及身前一名干员已激活的盟约层数+18", "type": "持续叠加", "head": "485_pallas"}], "pacts": [{"name": "炎", "core": true, "need": 3, "effect": "【炎】干员攻击力+(23+0.9×层数)%\n<在场6名不同的【炎】干员>战斗开始时，【炎】干员每次攻击时造成攻击力6%的随机元素损伤；全场敌人元素损伤恢复速度增加(40+0.3×层数)%"}, {"name": "萨尔贡", "core": true, "need": 3, "effect": "【萨尔贡】干员开启技能时，所有【萨尔贡】干员攻击速度+12（至多+300），持续(5+0.22×层数)秒\n<在场6名不同的【萨尔贡】干员>【萨尔贡】干员每次开启技能时，在攻击范围内制造一个流沙地面。位于流沙地面上的敌人受到(20+0.025×层数)%的迟钝效果，每5秒造成一次(5000+25×层数)点法术伤害并束缚1秒；【萨尔贡】干员技能持续期间，攻击范围内的流沙地面使敌人的迟钝效果变为2倍，每秒受到(800+4×层数)点法术伤害"}, {"name": "维多利亚", "core": true, "need": 3, "effect": "携带装备的【维多利亚】干员伤害提升至(125+0.8×层数)%\n<每叠加25层>获得一件带有随机特殊效果的维式重锤\n<在场6名不同【维多利亚】干员>【维多利亚】干员每携带1件装备攻击力+40%，携带进阶装备改为+80%"}, {"name": "谢拉格", "core": true, "need": 3, "effect": "【谢拉格】干员伤害提升至125%，对寒冷和冻结敌人额外提升至(135+1×层数)%\n<每叠加100层>获得一件谢拉格不融冰\n<在场6名不同的【谢拉格】干员>战斗开始时召唤可自主行动的雪山巨人，其攻击力和生命值随谢拉格层数提升而提升。雪山巨人将在巨人和雪山形态转换，雪山形态可以阻挡敌人并造成溅射伤害，雪山形态攻击被冻结的敌人时造成高额法术伤害并解除目标的冻结状态；巨人形态可以移动并对敌人造成远程溅射伤害"}, {"name": "阿戈尔", "core": true, "need": 3, "effect": "【阿戈尔】干员生命值+(35+1×层数)%\n战斗开始时【阿戈尔】干员依次吞噬身前一格干员造成5000点物理伤害并获得其基础攻击力和阻挡数，并叠加等于被吞噬者等阶的盟约层数（【阿戈尔】之间优先对更靠左和靠上的干员发起吞噬）\n<在场6名不同【阿戈尔】干员>前3名【阿戈尔】干员首次被击倒时立刻复活"}, {"name": "叙拉古", "core": true, "need": 3, "effect": "【叙拉古】干员部署后攻击速度+(25+0.8×层数)，持续(32+0.4×层数)秒\n<在场6名不同的【叙拉古】干员>每次攻击时有30%概率为敌人随机附加一个异常状态，持续(1+0.0018×层数)秒；敌人存在2种或以上异常状态时，每秒对自身及周围一定范围内的敌人造成(800+10×层数)点真实伤害"}, {"name": "卡西米尔", "core": true, "need": 3, "effect": "每次有干员部署时【卡西米尔】干员攻击力+20%（至多+(50+1×层数)%），持续至战斗结束\n<在场6名不同的【卡西米尔】干员>【卡西米尔】地面干员被击倒时离场并召唤整备区最右侧【卡西米尔】干员加入战斗（不改变当前盟约的激活状态）；【卡西米尔】干员开启技能或部署后30秒内攻击时附带攻击力65%的真实伤害"}, {"name": "乌萨斯", "core": true, "need": 3, "effect": "【乌萨斯】干员攻击力+(35+0.75×层数)%，生命值+(10+0.3×层数)%，【乌萨斯】干员击倒其他单位时为【乌萨斯】叠加2层临时层数\n<在场6名不同的【乌萨斯】干员>【乌萨斯】干员受到伤害的(15+0.05×层数)%转化为10秒的生命流失，当伤害来源被击倒时不再流失生命；阻挡敌人期间，敌人每秒受到相当于攻击力(50+0.25×层数)%的法术伤害；【乌萨斯】干员击倒其他单位时叠加的临时层数提升至4层"}, {"name": "伊比利亚", "core": true, "need": 3, "effect": "【伊比利亚】干员或炼金单元每次造成伤害时，使目标每秒受到(11+0.06×层数)%攻击力（至多叠加10次）的持续法术伤害，持续10秒\n<在场6名不同的【伊比利亚】干员>【伊比利亚】干员或炼金单元造成伤害时附带的持续法术伤害提升至2倍，并使目标移动速度-4%（至多-80%），持续10秒；【伊比利亚】干员或炼金单元每次造成伤害时有20%概率弹射到周围一定范围内的敌人造成300%攻击力的法术伤害"}, {"name": "莱塔尼亚", "core": true, "need": 3, "effect": "【莱塔尼亚】干员和召唤物攻击力+(30+1×层数)%，场上敌人被击倒时在附近召唤“一个小节”（场上最多存在10个）\n<在场6名不同的【莱塔尼亚】干员>召唤“一个小节”时(30+0.1×层数)%概率改为召唤“一个乐部”，在场时使【莱塔尼亚】干员攻速+20；场上【莱塔尼亚】召唤物上限提升至20；场上我方干员被击倒时会额外召唤“一个小节”"}, {"name": "精准", "core": false, "need": 2, "effect": "【精准】干员攻击力+(10+1.2×层数)%\n<在场3名不同【精准】干员>生效范围变为【精准】干员和所有远程干员，且攻击无视30%防御力和法术抗性"}, {"name": "迅捷", "core": false, "need": 2, "effect": "【迅捷】干员技能结束时有(20+0.35×层数)%概率立刻回复12点技力\n<达到40层>所有干员技能结束时有等概率额外回复15点技力"}, {"name": "灵巧", "core": false, "need": 2, "effect": "【灵巧】干员及周围4格的干员攻击速度+(10+1×层数)\n<达到40层>生效范围变为【灵巧】干员周围8格"}, {"name": "坚守", "core": false, "need": 2, "effect": "所有干员生命值+(25+1.2×层数)%\n<在场3名不同【坚守】干员>场上非【坚守】干员受到伤害时，所受伤害的40%由【坚守】干员平均承担；【坚守】干员受到伤害时，伤害来源受到(850+10×层数)点法术伤害（每0.2秒至多触发1次）和持续5秒的40%的脆弱效果"}, {"name": "助力", "core": false, "need": 2, "effect": "所有干员防御力+(15+1.2×层数)%，再部署时间-30%\n休整期结束时，使当前所有已激活的盟约层数+2\n<在场3名不同【助力】干员>改为层数+4"}, {"name": "远见", "core": false, "need": 2, "effect": "<每叠加10层>获得一次2资金\n<首次到达80层>所有【远见】干员购买价格永久-1资金\n<首次到达150层>所有【远见】干员购买价格额外永久-1资金\n整备区的【远见】干员也可用于激活盟约"}, {"name": "奇迹", "core": false, "need": 2, "effect": "刷新调度中心时，有(18+0.25×层数)%概率使下次刷新不消耗资金\n<首次到达100层>调度中心刷新时至少出现一名等同于当前调度中心等级的干员\n整备区的【奇迹】干员也可用于激活盟约"}, {"name": "投资人", "core": false, "need": 3, "effect": "干员的“获得时”类特质每次触发2次\n<达到100层>“获得时”类特质每次触发3次\n整备区的【投资人】干员也可用于激活盟约"}, {"name": "突袭", "core": false, "need": 2, "effect": "【突袭】干员10秒内未进行攻击或技能就绪时，若范围内没有敌人，则保留技力立即再部署至一名地面敌人周围，期间攻击力和生命值+(25+1×层数)%\n<达到50层>所有干员攻击速度+50"}, {"name": "不屈", "core": false, "need": 2, "effect": "地面干员被击倒时，有(18+0.4×层数)%概率立刻重新部署\n<在场3名不同【不屈】干员>地面干员被击倒时使场上所有干员技力+5"}, {"name": "调和", "core": false, "need": 1, "effect": "激活时可以使场上核心盟约的激活人数+1，【调和】干员享受已激活的核心盟约的效果"}, {"name": "协防干员", "core": false, "need": 2, "effect": "所有干员受到的物理和法术伤害-20%；【协防干员】伤害提升至120%，精锐【协防干员】造成伤害提升至140%"}, {"name": "独行", "core": false, "need": 1, "effect": "<在场1名【独行】干员>【独行】干员攻击力和生命值+60%，初始技力+15（在场2名及以上【独行】干员时失效）"}, {"name": "绝技", "core": false, "need": 2, "effect": "<在场2名精锐状态的干员>精锐状态的干员攻击力+30%\n<在场5名精锐状态的干员>精锐状态的干员技力消耗-30%\n（所有干员的精锐状态均可激活盟约）"}, {"name": "聚合", "core": false, "need": 2, "effect": "【聚合】干员攻击范围内的我方单位每秒回复攻击力(16+0.12×层数)%的生命值和攻击力(8+0.06×层数)%的元素损伤\n<在场3名【聚合】干员>【聚合】干员攻击范围内的所有干员获得(15+0.08×层数)%的庇护"}, {"name": "奥术", "core": false, "need": 2, "effect": "【奥术】干员造成伤害时额外附加一次(20+0.4×层数)%攻击力的法术伤害\n<在场3名不同【奥术】干员>场上所有敌人每次受到伤害时法术抗性-1（至多(-30-0.05×层数)）；【奥术】干员攻击范围内的敌人隐匿效果失效"}]};
+const ROLE = {"持续叠加":{k:"stack",s:"叠层"},"单次叠加":{k:"once",s:"单叠"},"作战能力":{k:"fight",s:"战斗"},"整备能力":{k:"prep",s:"整备"},"特异化":{k:"spec",s:"特异"}};
+const PC = {"炎":"#d24b3e","萨尔贡":"#c8952a","维多利亚":"#3e63c4","谢拉格":"#3f9fd0","阿戈尔":"#22907f","叙拉古":"#7a52b8","卡西米尔":"#7f9a2e","乌萨斯":"#8f5a3a","伊比利亚":"#4d6680","莱塔尼亚":"#b1488f"};
+const OPS = DATA.ops, PACTS = DATA.pacts;
+const OPMAP = Object.fromEntries(OPS.map(o=>[o.name,o]));
+const CORE = PACTS.filter(p=>p.core).map(p=>p.name);
+const SUB = PACTS.filter(p=>!p.core).map(p=>p.name);
+const CORESET = new Set(CORE);
+OPS.forEach(o=>{o.core=o.pacts.filter(p=>CORESET.has(p)); o.sub=o.pacts.filter(p=>!CORESET.has(p)); o.r=ROLE[o.type];});
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- state ---------- */
+const state={bp:new Set(),bo:new Set(),rule:"any"};
+try{const s=JSON.parse(localStorage.getItem("ark-ban")||"null"); if(s){state.bp=new Set(s.bp||[]);state.bo=new Set(s.bo||[]);state.rule=s.rule||"any";}}catch(e){}
+function save(){try{localStorage.setItem("ark-ban",JSON.stringify({bp:[...state.bp],bo:[...state.bo],rule:state.rule}))}catch(e){}}
+function avail(o){
+  if(state.bo.has(o.name)) return false;
+  if(!o.core.length) return true;
+  const n=o.core.filter(p=>state.bp.has(p)).length;
+  return state.rule==="any" ? n===0 : n<o.core.length;
+}
+function toggleOp(name){state.bo.has(name)?state.bo.delete(name):state.bo.add(name); update();}
+function togglePact(p){if(state.bp.has(p))state.bp.delete(p); else if(state.bp.size<5)state.bp.add(p); update();}
+
+/* ---------- header ---------- */
+$("#subline").textContent=`${OPS.length} 名干员 · ${CORE.length} 个主盟约 · ${SUB.length} 个副盟约`;
+$("#legend").innerHTML="边框颜色："+Object.entries(ROLE).map(([full,r])=>`<span class="role-${r.k}" title="${full}"><i></i><b>${r.s}</b></span>`).join("");
+try{if(localStorage.getItem("ark-names")==="1"){$("#showNames").checked=true;document.body.classList.add("names");}}catch(e){}
+$("#showNames").addEventListener("change",e=>{document.body.classList.toggle("names",e.target.checked);try{localStorage.setItem("ark-names",e.target.checked?"1":"0")}catch(_){} drawAllWires();});
+const img=o=>`heads/${o.head}.webp`;
+function avHTML(o,cls="",extra=""){return `<button type="button" class="av role-${o.r.k} ${cls}${avail(o)?"":" off"}" data-op="${esc(o.name)}" aria-label="${esc(o.name)}"><img src="${img(o)}" alt="" width="46" height="46" loading="lazy">${extra}<span class="cap">${esc(o.name)}</span></button>`;}
+
+/* ---------- tooltip ---------- */
+const tip=$("#tip");
+function showTip(o,ev){
+  tip.className="role-"+o.r.k;
+  tip.innerHTML=`<b>${esc(o.name)}</b> <span class="row">${o.tier}本 · ${esc(o.pacts.join(" / "))} · ${o.type}${avail(o)?"":" · 不可用"}</span>
+  <p><span class="lab">精锐化前</span> ${esc(o.n)}</p><p><span class="lab">精锐化后</span> ${esc(o.e)}</p>`;
+  tip.hidden=false; moveTip(ev);
+}
+function showPactTip(name,ev){
+  const P=PACTS.find(p=>p.name===name);
+  tip.className=""; tip.innerHTML=`<b style="color:var(--ink)">${esc(name)}</b> <span class="row">${P.core?"主盟约":"副盟约"} · ${P.need} 人激活${state.bp.has(name)?" · 已禁用":""}</span><p style="white-space:pre-line">${esc(P.effect)}</p>`;
+  tip.hidden=false; moveTip(ev);
+}
+function moveTip(ev){const w=tip.offsetWidth,h=tip.offsetHeight;let x=ev.clientX+14,y=ev.clientY+14;if(x+w>innerWidth-8)x=ev.clientX-w-14;if(y+h>innerHeight-8)y=ev.clientY-h-14;tip.style.left=x+"px";tip.style.top=y+"px";}
+function hideTip(){tip.hidden=true}
+
+/* ---------- sidebar ---------- */
+function renderSide(){
+  $("#banPacts").innerHTML=CORE.map(p=>`<button type="button" class="ptog${state.bp.has(p)?" on":""}" data-p="${p}" ${!state.bp.has(p)&&state.bp.size>=5?"disabled":""} aria-pressed="${state.bp.has(p)}">${p}</button>`).join("");
+  $("#bpCount").textContent=state.bp.size+"/5";
+  $("#ruleAny").checked=state.rule==="any"; $("#ruleAll").checked=state.rule==="all";
+  $("#boCount").textContent=state.bo.size;
+  $("#bannedOps").innerHTML=[...state.bo].map(n=>{const o=OPMAP[n];return `<button type="button" class="btag role-${o.r.k}" data-op="${esc(n)}" title="解禁"><img src="${img(o)}" alt="">${esc(n)}<i>×</i></button>`}).join("");
+  renderSearch();
+  const av=OPS.filter(avail);
+  $("#availCount").textContent=av.length+"/"+OPS.length;
+  let h="";
+  for(let t=1;t<=6;t++){const l=av.filter(o=>o.tier===t); if(!l.length)continue;
+    h+=`<div class="arow"><span class="tl">${t}本·${l.length}</span><div class="names">${l.map(o=>avHTML(o,"xs")).join("")}</div></div>`;}
+  $("#availList").innerHTML=h||'<p class="hint">没有可用干员</p>';
+}
+function searchHits(){const q=$("#opSearch").value.trim().toLowerCase(); if(!q)return []; return OPS.filter(o=>o.name.toLowerCase().includes(q)||o.pacts.some(p=>p===q)).slice(0,12);}
+function renderSearch(){
+  $("#searchRes").innerHTML=searchHits().map(o=>`<button type="button" class="role-${o.r.k}" data-op="${esc(o.name)}"><span><span class="nm"><img src="${img(o)}" alt="">${esc(o.name)}</span> <span class="pk">${o.tier}本 · ${esc(o.pacts.join("/"))}</span></span><span class="st">${state.bo.has(o.name)?"已禁用":""}</span></button>`).join("");
+}
+$("#banPacts").addEventListener("click",e=>{const b=e.target.closest("[data-p]"); if(b)togglePact(b.dataset.p);});
+document.querySelectorAll('input[name="rule"]').forEach(r=>r.addEventListener("change",()=>{state.rule=r.value;update();}));
+$("#opSearch").addEventListener("input",renderSearch);
+$("#opSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){const h=searchHits(); if(h.length){state.bo.add(h[0].name); $("#opSearch").value=""; update();}}});
+$("#searchRes").addEventListener("click",e=>{const b=e.target.closest("[data-op]"); if(b)toggleOp(b.dataset.op);});
+$("#availList").addEventListener("click",e=>{const b=e.target.closest("[data-op]"); if(b){hideTip();toggleOp(b.dataset.op);}});
+const asideEl=document.querySelector("aside");
+asideEl.addEventListener("pointerover",e=>{const b=e.target.closest("#availList [data-op]"); if(b)showTip(OPMAP[b.dataset.op],e); else hideTip();});
+asideEl.addEventListener("pointermove",e=>{if(!tip.hidden)moveTip(e);});
+asideEl.addEventListener("pointerleave",hideTip);
+$("#bannedOps").addEventListener("click",e=>{const b=e.target.closest("[data-op]"); if(b)toggleOp(b.dataset.op);});
+$("#clearBans").addEventListener("click",()=>{state.bp.clear();state.bo.clear();update();});
+
+/* ---------- view 1: pact board ---------- */
+function chipHTML(o,pact){
+  const others=o.core.filter(p=>p!==pact);
+  return avHTML(o,"",others.length?`<span class="xp">${others.map(p=>`<i style="background:${PC[p]}" title="也属于${p}"></i>`).join("")}</span>`:"");
+}
+function cardHTML(pn){
+  const P=PACTS.find(p=>p.name===pn);
+  const mem=OPS.filter(o=>o.core.includes(pn));
+  const nAv=mem.filter(avail).length;
+  // center rows by tier
+  let rows="";
+  for(let t=1;t<=6;t++){const l=mem.filter(o=>o.tier===t); if(l.length) rows+=`<div class="trow"><span class="tl">${t}本</span><div class="chips">${l.map(o=>chipHTML(o,pn)).join("")}</div></div>`;}
+  // secondary pacts linked from this pact's members
+  const subs={};
+  mem.forEach(o=>o.sub.forEach(s=>{(subs[s]=subs[s]||{links:[],tiers:[]}); subs[s].links.push(o.name); subs[s].tiers.push(o.tier);}));
+  const boxes=Object.entries(subs).map(([s,v])=>{
+    const pure=OPS.filter(o=>!o.core.length&&o.sub.includes(s)).sort((a,b)=>a.tier-b.tier);
+    return {s,v,pure,h:2+Math.ceil(pure.length/4),mt:v.tiers.reduce((a,b)=>a+b,0)/v.tiers.length};
+  }).sort((a,b)=>SUB.indexOf(a.s)-SUB.indexOf(b.s));
+  // same global order in every card: left column top→bottom, then right column
+  const half=Math.ceil(boxes.length/2), L=boxes.slice(0,half), R=boxes.slice(half);
+  const boxHTML=b=>{const SP=PACTS.find(p=>p.name===b.s); return `<div class="sbox" data-sp="${b.s}"><div class="sh">${b.s}<span>${SP.need} 人激活</span></div>
+    <details class="se"><summary>激活效果</summary><p>${esc(SP.effect)}</p></details>
+    <div class="sops">${b.pure.length?b.pure.map(o=>avHTML(o,"sm")).join(""):'<span class="none">没有只带副盟约的干员</span>'}</div></div>`;};
+  const banned=state.bp.has(pn);
+  return `<article class="card${banned?" banned-pact":""}" data-pact="${pn}" style="--pc:${PC[pn]}">
+    <header><h3>${pn}</h3>${banned?'<span class="tag-ban">已禁用</span>':""}<span class="meta">${P.need} 人激活 · ${mem.length} 名干员 · 可用 ${nAv}</span></header>
+    <details><summary>激活效果</summary><p>${esc(P.effect)}</p></details>
+    <div class="body"><svg class="wires" aria-hidden="true"></svg>
+      <div class="side L">${L.map(boxHTML).join("")}</div>
+      <div class="center">${rows}</div>
+      <div class="side R">${R.map(boxHTML).join("")}</div>
+    </div></article>`;
+}
+const openEff=new Set();
+function renderCards(){
+  const key=d=>d.closest(".card").dataset.pact+"|"+(d.closest(".sbox")?d.closest(".sbox").dataset.sp:"");
+  document.querySelectorAll(".card details[open]").forEach(d=>openEff.add(key(d)));
+  document.querySelectorAll(".card details:not([open])").forEach(d=>openEff.delete(key(d)));
+  const order=[...CORE].sort((a,b)=>(state.bp.has(a)-state.bp.has(b)));
+  $("#cards").innerHTML=order.map(cardHTML).join("");
+  openEff.forEach(k=>{const [p,sp]=k.split("|"); const d=sp?document.querySelector(`.card[data-pact="${p}"] .sbox[data-sp="${sp}"] details`):document.querySelector(`.card[data-pact="${p}"] > details`); if(d)d.open=true;});
+  drawAllWires();
+}
+function drawWires(card){
+  const body=card.querySelector(".body"), svg=body.querySelector(".wires");
+  if(getComputedStyle(svg).display==="none")return;
+  const br=body.getBoundingClientRect(); let h="";
+  card.querySelectorAll(".center .av").forEach(ch=>{
+    const o=OPMAP[ch.dataset.op], r=ch.querySelector("img").getBoundingClientRect(), ok=avail(o);
+    o.sub.forEach(s=>{
+      const box=card.querySelector(`.sbox[data-sp="${s}"]`); if(!box)return;
+      const bb=box.getBoundingClientRect(), hh=box.querySelector(".sh").getBoundingClientRect();
+      const left=box.parentElement.classList.contains("L");
+      const x1=(left?r.left:r.right)-br.left, y1=r.top+r.height/2-br.top;
+      const x2=(left?bb.right:bb.left)-br.left, y2=hh.top+hh.height/2-br.top;
+      const mx=(x1+x2)/2;
+      h+=`<path class="w${ok?"":" off"}" data-op="${esc(o.name)}" data-sp="${s}" d="M${x1.toFixed(1)} ${y1.toFixed(1)}C${mx.toFixed(1)} ${y1.toFixed(1)} ${mx.toFixed(1)} ${y2.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}"/>`;
+      h+=`<circle class="dot" cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="2.5"/>`;
+    });
+  });
+  svg.innerHTML=h;
+}
+function drawAllWires(){document.querySelectorAll(".card").forEach(drawWires);}
+const cardsEl=$("#cards");
+function clearFocus(){document.querySelectorAll(".card.focus").forEach(c=>{c.classList.remove("focus");c.querySelectorAll(".hl").forEach(x=>x.classList.remove("hl"));});}
+cardsEl.addEventListener("pointerover",e=>{
+  const card=e.target.closest(".card"); if(!card)return;
+  const chip=e.target.closest(".center .av"), box=e.target.closest(".sbox"), mini=e.target.closest("[data-op]");
+  clearFocus();
+  if(chip){card.classList.add("focus");chip.classList.add("hl");
+    card.querySelectorAll(`.w[data-op="${CSS.escape(chip.dataset.op)}"]`).forEach(w=>{w.classList.add("hl");card.querySelector(`.sbox[data-sp="${w.dataset.sp}"]`).classList.add("hl");});}
+  else if(box){card.classList.add("focus");box.classList.add("hl");
+    card.querySelectorAll(`.w[data-sp="${box.dataset.sp}"]`).forEach(w=>{w.classList.add("hl");card.querySelector(`.center .av[data-op="${CSS.escape(w.dataset.op)}"]`).classList.add("hl");});}
+  if(mini) showTip(OPMAP[mini.dataset.op],e); else hideTip();
+});
+cardsEl.addEventListener("pointermove",e=>{if(!tip.hidden)moveTip(e);});
+cardsEl.addEventListener("pointerleave",()=>{clearFocus();hideTip();});
+cardsEl.addEventListener("click",e=>{const b=e.target.closest("[data-op]"); if(b){toggleOp(b.dataset.op);}});
+new ResizeObserver(()=>{if(!$("#view-pacts").hidden)drawAllWires();}).observe($("#cards"));
+document.addEventListener("toggle",e=>{if(e.target.closest&&e.target.closest(".card"))drawAllWires();},true);
+
+/* ---------- view 2: graph ---------- */
+const svg=$("#g"), vp=$("#vp"), gE=$("#gEdges"), gN=$("#gNodes");
+const G={nodes:[],edges:[],by:{},k:1,tx:0,ty:0,built:false};
+function textW(s){let w=0;for(const c of s)w+=/[\x00-\x7f]/.test(c)?7.6:13.4;return w;}
+function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}}
+function layoutGraph(){
+  const rnd=rng(7);
+  const N=[],E=[],by={};
+  CORE.forEach((p,i)=>{const a=i/CORE.length*Math.PI*2-Math.PI/2;const n={id:"p:"+p,hub:true,core:true,name:p,x:Math.cos(a)*720,y:Math.sin(a)*720,r:38,cr:58,fixed:true,vx:0,vy:0,edges:[]};N.push(n);by[n.id]=n;});
+  SUB.forEach((p,i)=>{const a=i/SUB.length*Math.PI*2;const n={id:"p:"+p,hub:true,core:false,name:p,x:Math.cos(a)*260,y:Math.sin(a)*260,w:textW(p)+26,cr:44,vx:0,vy:0,edges:[]};N.push(n);by[n.id]=n;});
+  OPS.forEach(o=>{
+    const hubs=(o.core.length?o.core:o.sub).map(p=>by["p:"+p]);
+    const x=hubs.reduce((a,h)=>a+h.x,0)/hubs.length, y=hubs.reduce((a,h)=>a+h.y,0)/hubs.length;
+    const n={id:"o:"+o.name,op:o,x:x*0.85+(rnd()-.5)*160,y:y*0.85+(rnd()-.5)*160,w:44,cr:31,vx:0,vy:0,edges:[]};
+    N.push(n);by[n.id]=n;
+    o.pacts.forEach(p=>{const core=CORESET.has(p);const e={s:n,t:by["p:"+p],core,
+      L:core?(o.core.length>1?160:120):(o.core.length?260:90),
+      k:core?0.05:(o.core.length?0.003:0.05)};E.push(e);n.edges.push(e);by["p:"+p].edges.push(e);});
+  });
+  const IT=650;
+  for(let it=0;it<IT;it++){
+    const al=1-it/IT;
+    for(let i=0;i<N.length;i++){const a=N[i];for(let j=i+1;j<N.length;j++){const b=N[j];
+      let dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy; if(d2<1){dx=rnd()-.5;dy=rnd()-.5;d2=dx*dx+dy*dy+.01;}
+      const d=Math.sqrt(d2), min=a.cr+b.cr; let f=d<900?2600/d2:0; if(d<min)f+=(min-d)*0.35;
+      const fx=dx/d*f, fy=dy/d*f; a.vx-=fx;a.vy-=fy;b.vx+=fx;b.vy+=fy;}}
+    for(const e of E){const dx=e.t.x-e.s.x,dy=e.t.y-e.s.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=(d-e.L)*e.k,fx=dx/d*f,fy=dy/d*f;e.s.vx+=fx;e.s.vy+=fy;e.t.vx-=fx;e.t.vy-=fy;}
+    for(const n of N){ if(n.fixed){n.vx=n.vy=0;continue;}
+      n.vx-=n.x*0.0008; n.vy-=n.y*0.0008;
+      const v=Math.hypot(n.vx,n.vy), cap=40; if(v>cap){n.vx*=cap/v;n.vy*=cap/v;}
+      n.x+=n.vx*(0.3+al*0.7); n.y+=n.vy*(0.3+al*0.7); n.vx*=0.55; n.vy*=0.55;}
+  }
+  Object.assign(G,{nodes:N,edges:E,by});
+}
+function loadPos(){try{const p=JSON.parse(localStorage.getItem("ark-graph-pos")||"null"); if(p)G.nodes.forEach(n=>{if(p[n.id]){n.x=p[n.id][0];n.y=p[n.id][1];}});}catch(e){}}
+function savePos(){try{localStorage.setItem("ark-graph-pos",JSON.stringify(Object.fromEntries(G.nodes.map(n=>[n.id,[Math.round(n.x),Math.round(n.y)]]))))}catch(e){}}
+function renderGraph(){
+  gE.innerHTML=G.edges.map((e,i)=>`<line class="ge${e.core?"":" sub"}" data-i="${i}" ${e.core?`stroke="${PC[e.t.name]}"`:""}/>`).join("");
+  gN.innerHTML=G.nodes.map(n=>{
+    if(n.hub&&n.core) return `<g class="gh" data-id="${n.id}"><circle r="${n.r}" fill="${PC[n.name]}"/><text>${n.name}</text></g>`;
+    if(n.hub) return `<g class="gh sub" data-id="${n.id}"><rect x="${-n.w/2}" y="-15" width="${n.w}" height="30" rx="15"/><text>${n.name}</text></g>`;
+    const o=n.op;
+    return `<g class="gn role-${o.r.k}${o.core.length>1?" multi":""}" data-id="${esc(n.id)}"><rect class="bd" x="-22" y="-22" width="44" height="44" rx="8"/><image href="${img(o)}" x="-19" y="-19" width="38" height="38" clip-path="url(#avclip)" preserveAspectRatio="xMidYMid slice"/><circle class="tb" cx="-19" cy="-19" r="8"/><text x="-19" y="-19">${o.tier}</text><text class="nm" y="33">${esc(o.name)}</text></g>`;
+  }).join("");
+  G.nodes.forEach(n=>{n.el=gN.querySelector(`[data-id="${CSS.escape(n.id)}"]`);});
+  G.edges.forEach((e,i)=>{e.el=gE.children[i];});
+  G.nodes.forEach(placeNode); G.edges.forEach(placeEdge);
+  applyGraphState();
+}
+function placeNode(n){n.el.setAttribute("transform",`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`);}
+function placeEdge(e){const l=e.el;l.setAttribute("x1",e.s.x.toFixed(1));l.setAttribute("y1",e.s.y.toFixed(1));l.setAttribute("x2",e.t.x.toFixed(1));l.setAttribute("y2",e.t.y.toFixed(1));}
+function applyView(){vp.setAttribute("transform",`translate(${G.tx},${G.ty}) scale(${G.k})`);}
+function fit(){
+  const vis=G.nodes.filter(n=>!n.el.classList.contains("gone"));
+  const xs=vis.map(n=>n.x),ys=vis.map(n=>n.y);
+  const x0=Math.min(...xs)-90,x1=Math.max(...xs)+90,y0=Math.min(...ys)-60,y1=Math.max(...ys)+60;
+  const W=svg.clientWidth,H=svg.clientHeight; G.k=Math.min(W/(x1-x0),H/(y1-y0));
+  G.tx=W/2-(x0+x1)/2*G.k; G.ty=H/2-(y0+y1)/2*G.k; applyView();
+}
+function applyGraphState(){
+  if(!G.built)return;
+  const showCore=$("#gCore").checked, showSub=$("#gSub").checked, hide=$("#gHide").checked;
+  G.nodes.forEach(n=>{
+    if(n.hub){n.el.classList.toggle("off",n.core&&state.bp.has(n.name));return;}
+    const ok=avail(n.op); n.el.classList.toggle("off",!ok&&!hide); n.el.classList.toggle("gone",!ok&&hide);});
+  G.edges.forEach(e=>{const ok=avail(e.s.op);
+    e.el.classList.toggle("gone",(e.core?!showCore:!showSub)||(!ok&&hide));
+    e.el.classList.toggle("off",!ok&&!hide);});
+  if(G.focus)showInfo(G.focus);
+}
+function buildGraph(){
+  if(G.built)return; layoutGraph(); loadPos(); G.built=true; renderGraph(); fit();
+}
+/* hover highlight */
+function hoverOn(n){
+  svg.classList.add("hov"); n.el.classList.add("hl");
+  n.edges.forEach(e=>{e.el.classList.add("hl"); const m=e.s===n?e.t:e.s; m.el.classList.add("nb");});
+}
+function hoverOff(){svg.classList.remove("hov"); svg.querySelectorAll(".hl,.nb").forEach(x=>x.classList.remove("hl","nb"));}
+/* interaction */
+let drag=null;
+function toGraph(ev){const r=svg.getBoundingClientRect();return {x:(ev.clientX-r.left-G.tx)/G.k,y:(ev.clientY-r.top-G.ty)/G.k};}
+svg.addEventListener("pointerdown",e=>{
+  const el=e.target.closest("[data-id]"); svg.setPointerCapture(e.pointerId);
+  if(el){const n=G.by[el.dataset.id]; const p=toGraph(e);
+    const group=[n]; if(n.hub&&n.core) G.nodes.forEach(m=>{if(m.op&&m.op.core.length===1&&m.op.core[0]===n.name)group.push(m);});
+    drag={kind:"node",n,group,last:p,moved:0};}
+  else {drag={kind:"pan",sx:e.clientX,sy:e.clientY,tx:G.tx,ty:G.ty,moved:0}; svg.classList.add("panning");}
+});
+svg.addEventListener("pointermove",e=>{
+  if(!drag){const el=e.target.closest("[data-id]"); hoverOff(); if(el){const n=G.by[el.dataset.id]; hoverOn(n); if(n.op)showTip(n.op,e); else showPactTip(n.name,e);} else hideTip(); return;}
+  hideTip();
+  if(drag.kind==="pan"){G.tx=drag.tx+e.clientX-drag.sx;G.ty=drag.ty+e.clientY-drag.sy;drag.moved+=1;applyView();return;}
+  const p=toGraph(e),dx=p.x-drag.last.x,dy=p.y-drag.last.y; drag.last=p; drag.moved+=Math.abs(dx)+Math.abs(dy);
+  const touched=new Set();
+  drag.group.forEach(n=>{n.x+=dx;n.y+=dy;placeNode(n);n.edges.forEach(ed=>touched.add(ed));});
+  touched.forEach(placeEdge);
+});
+svg.addEventListener("pointerup",e=>{
+  if(drag&&drag.kind==="node"){ if(drag.moved<3&&drag.n.op){G.focus=drag.n.op;showInfo(drag.n.op);} else savePos(); }
+  if(drag&&drag.kind==="pan"&&drag.moved<2){G.focus=null;$("#ginfo").hidden=true;}
+  drag=null; svg.classList.remove("panning");
+});
+svg.addEventListener("pointerleave",()=>{if(!drag){hoverOff();hideTip();}});
+svg.addEventListener("wheel",e=>{e.preventDefault();const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const k=Math.min(3,Math.max(.12,G.k*Math.exp(-e.deltaY*0.0015)));G.tx=mx-(mx-G.tx)*k/G.k;G.ty=my-(my-G.ty)*k/G.k;G.k=k;applyView();},{passive:false});
+function showInfo(o){
+  const box=$("#ginfo"); box.className="info role-"+o.r.k; const ok=avail(o);
+  box.innerHTML=`<h4>${esc(o.name)}</h4><div class="row">${o.tier}本 · ${esc(o.pacts.join(" / "))} · ${o.type}${ok?"":" · 不可用"}</div>
+  <p><span class="row">精锐化前</span> ${esc(o.n)}</p><p><span class="row">精锐化后</span> ${esc(o.e)}</p>
+  <div class="acts"><button type="button" id="gBan">${state.bo.has(o.name)?"解禁":"禁用"}这名干员</button><button type="button" id="gClose">关闭</button></div>`;
+  box.hidden=false;
+  $("#gBan").onclick=()=>toggleOp(o.name);
+  $("#gClose").onclick=()=>{G.focus=null;box.hidden=true;};
+}
+["gCore","gSub","gHide"].forEach(id=>$("#"+id).addEventListener("change",applyGraphState));
+$("#gFit").addEventListener("click",fit);
+$("#gReset").addEventListener("click",()=>{try{localStorage.removeItem("ark-graph-pos")}catch(e){} layoutGraph(); renderGraph(); fit();});
+
+/* ---------- routing & update ---------- */
+function update(){save(); renderSide(); renderCards(); applyGraphState();}
+function route(){
+  const v=location.hash==="#graph"?"graph":"pacts";
+  document.querySelectorAll(".tabs a").forEach(a=>a.classList.toggle("on",a.dataset.view===v));
+  $("#view-pacts").hidden=v!=="pacts"; $("#view-graph").hidden=v!=="graph";
+  hideTip();
+  if(v==="graph") buildGraph(); else drawAllWires();
+}
+addEventListener("hashchange",route);
+renderSide(); renderCards(); route();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{drawAllWires();});
+</script>
+</body>
+</html>
